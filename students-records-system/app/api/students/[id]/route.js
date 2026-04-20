@@ -1,5 +1,9 @@
+// app/api/students/[id]/route.js
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
 
 const STUDENT_SELECT = `
   *,
@@ -9,14 +13,13 @@ const STUDENT_SELECT = `
     subject_id,
     subjects ( id, code, name, units )
   ),
-  grades (
+  grades!grades_student_id_fkey (
     id,
     grade,
     semester,
     school_year,
-    student_subject_id,
     subject_id,
-    subjects ( id, code, name, units )
+    subjects!grades_subject_id_fkey ( id, code, name, units )
   )
 `
 
@@ -33,7 +36,7 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({ data })
   } catch (err) {
-    console.error('[GET /api/students/[id]]', err)
+    console.error('[GET /api/students/[id]]', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
@@ -43,7 +46,6 @@ export async function PUT(request, { params }) {
     const body = await request.json()
     const { grades: gradeMap, subjects, semester, school_year, ...studentFields } = body
 
-    // 1. Check email uniqueness
     const { data: existingEmail } = await supabase
       .from('students')
       .select('id')
@@ -53,12 +55,11 @@ export async function PUT(request, { params }) {
 
     if (existingEmail) {
       return NextResponse.json(
-        { error: `Email "${studentFields.email}" is already in use.` },
+        { error: `Email "${studentFields.email}" is already in use by another student.` },
         { status: 409 }
       )
     }
 
-    // 2. Update student info
     const { data: student, error: studentError } = await supabase
       .from('students')
       .update({
@@ -120,12 +121,12 @@ export async function PUT(request, { params }) {
     // 7. Upsert grades for all enrolled subjects
     const gradeRows = subjects.map((s) => {
       const enrollment = allEnrollments.find((e) => e.subject_id === s.id)
-      if (!enrollment) throw new Error(`Step 7: No enrollment found for subject ${s.code}`)
+      const rawGrade   = gradeMap[s.code]
       return {
         student_subject_id: enrollment.id,
         student_id:         params.id,
         subject_id:         s.id,
-        grade:              parseFloat(gradeMap[s.code]),
+        grade:              rawGrade,
         semester,
         school_year,
       }
@@ -146,15 +147,18 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+    await supabase.from('grades').delete().eq('student_id', params.id)
+
     const { error } = await supabase
       .from('students')
       .delete()
       .eq('id', params.id)
 
     if (error) throw error
+
     return NextResponse.json({ message: 'Student deleted successfully.' })
   } catch (err) {
-    console.error('[DELETE /api/students/[id]]', err)
+    console.error('[DELETE /api/students/[id]]', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
