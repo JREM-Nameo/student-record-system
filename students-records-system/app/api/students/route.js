@@ -2,26 +2,22 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
 const STUDENT_SELECT = `
   *,
   courses ( id, code, name ),
-  student_subjects (
-    id,
-    subject_id,
-    subjects ( id, code, name, units )
-  ),
-  grades (
+  grades!grades_student_id_fkey (
     id,
     grade,
     semester,
     school_year,
-    student_subject_id,
     subject_id,
-    subjects ( id, code, name, units )
+    subjects!grades_subject_id_fkey ( id, code, name, units )
   )
 `
 
-// ─── GET all students ────────────────────────────────────────
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -53,18 +49,16 @@ export async function GET(request) {
 
     return NextResponse.json({ data: result })
   } catch (err) {
-    console.error('[GET /api/students]', err)
+    console.error('[GET /api/students]', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
-// ─── POST create student ─────────────────────────────────────
 export async function POST(request) {
   try {
     const body = await request.json()
     const { grades: gradeMap, subjects, semester, school_year, ...studentFields } = body
 
-    // 1. Check duplicate student_id
     const { data: existing } = await supabase
       .from('students')
       .select('id')
@@ -78,7 +72,6 @@ export async function POST(request) {
       )
     }
 
-    // 2. Check duplicate email
     const { data: existingEmail } = await supabase
       .from('students')
       .select('id')
@@ -92,7 +85,6 @@ export async function POST(request) {
       )
     }
 
-    // 3. Insert student
     const { data: student, error: studentError } = await supabase
       .from('students')
       .insert([{
@@ -109,27 +101,14 @@ export async function POST(request) {
 
     if (studentError) throw studentError
 
-    // 4. Insert student_subjects
-    const ssRows = subjects.map((s) => ({
-      student_id: student.id,
-      subject_id: s.id,
-    }))
-
-    const { data: enrollments, error: ssError } = await supabase
-      .from('student_subjects')
-      .insert(ssRows)
-      .select()
-
-    if (ssError) throw ssError
-
-    // 5. Insert grades using student_subject_id
     const gradeRows = subjects.map((s) => {
       const enrollment = enrollments.find((e) => e.subject_id === s.id)
+      const rawGrade   = gradeMap[s.code]
       return {
         student_subject_id: enrollment.id,
         student_id:         student.id,
         subject_id:         s.id,
-        grade:              parseFloat(gradeMap[s.code]),
+        grade:              rawGrade,
         semester,
         school_year,
       }
@@ -143,7 +122,7 @@ export async function POST(request) {
 
     return NextResponse.json({ data: student }, { status: 201 })
   } catch (err) {
-    console.error('[POST /api/students]', err)
+    console.error('[POST /api/students]', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

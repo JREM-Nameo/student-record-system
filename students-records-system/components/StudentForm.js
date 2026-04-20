@@ -57,7 +57,7 @@ export default function StudentForm({ initialData = null, courses = [], subjects
       setForm(buildFormState(initialData, subjects))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjects.length])
+  }, [subjects.length, initialData])
 
   const enrolledSubjects = subjects.filter((s) =>
     form.enrolledSubjectIds.includes(s.id)

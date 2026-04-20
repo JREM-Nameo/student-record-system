@@ -3,13 +3,17 @@ import { getGWARemark, isPassing } from '@/lib/helpers'
 import { CheckCircle, XCircle } from 'lucide-react'
 
 function GradeBar({ grade }) {
-  const passing = isPassing(grade)
-  const width = `${grade}%`
+  const isInc = grade === 'INC'
+  const numericGrade = parseFloat(grade)
+  const passing = !isInc && !isNaN(numericGrade) && numericGrade >= 75
+  const width = isInc ? '0%' : `${Math.min(numericGrade, 100)}%`
 
   return (
     <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
       <div
-        className={`h-2 rounded-full transition-all duration-500 ${passing ? 'bg-green-500' : 'bg-red-500'}`}
+        className={`h-2 rounded-full transition-all duration-500 ${
+          isInc ? 'bg-yellow-500' : passing ? 'bg-green-500' : 'bg-red-500'
+        }`}
         style={{ width }}
       />
     </div>
@@ -46,15 +50,22 @@ export default function GradeDisplay({ grades = [], gwa }) {
       {grades.length > 0 ? (
         <div className="space-y-4">
           {grades.map((g) => {
-            const passing = isPassing(g.grade)
+            const isInc = g.grade === 'INC'
+            const numericGrade = parseFloat(g.grade)
+            const passing = !isInc && !isNaN(numericGrade) && numericGrade >= 75
             return (
               <div key={g.subjects?.code || g.id}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    {passing
-                      ? <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-                      : <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                    }
+                    {isInc ? (
+                      <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center shrink-0">
+                        <span className="text-xs text-black font-bold">!</span>
+                      </div>
+                    ) : passing ? (
+                      <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    )}
                     <span className="text-sm text-white font-medium">
                       {g.subjects?.name ?? g.subject_code}
                     </span>
@@ -63,15 +74,20 @@ export default function GradeDisplay({ grades = [], gwa }) {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold ${passing ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`text-sm font-bold ${
+                      isInc ? 'text-yellow-400' :
+                      passing ? 'text-green-400' : 'text-red-400'
+                    }`}>
                       {g.grade}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      passing
+                      isInc
+                        ? 'bg-yellow-500/10 text-yellow-400'
+                        : passing
                         ? 'bg-green-500/10 text-green-400'
                         : 'bg-red-500/10 text-red-400'
                     }`}>
-                      {passing ? 'PASS' : 'FAIL'}
+                      {isInc ? 'INC' : passing ? 'PASS' : 'FAIL'}
                     </span>
                   </div>
                 </div>

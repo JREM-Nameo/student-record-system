@@ -5,23 +5,61 @@
  * Each grade must have: grade (number), subjects: { units (number) }
  */
 export function computeGWA(grades) {
-  if (!grades || grades.length === 0) return null
-  const totalUnits = grades.reduce((sum, g) => sum + g.subjects.units, 0)
+  const numeric = grades.filter((g) => !isSpecialGrade(String(g.grade)))
+  if (numeric.length === 0) return null
+
+  const totalUnits  = numeric.reduce((sum, g) => sum + (g.subjects?.units ?? g.units ?? 0), 0)
+  const weightedSum = numeric.reduce((sum, g) => {
+    const units     = g.subjects?.units ?? g.units ?? 0
+    const converted = percentToGradeScale(g.grade)
+    return sum + (converted ?? 0) * units
+  }, 0)
+
   if (totalUnits === 0) return null
-  const weightedSum = grades.reduce((sum, g) => sum + g.grade * g.subjects.units, 0)
-  return parseFloat((weightedSum / totalUnits).toFixed(2))
+  return Math.round((weightedSum / totalUnits) * 100) / 100
 }
 
 /**
- * Get remark and color based on GWA
+ * Converts percentage (65–100) to 1.0–5.0 scale
+ * Below 75 = 5.0 (failed)
+ */
+export function percentToGradeScale(percent) {
+  const n = parseFloat(percent)
+  if (isNaN(n)) return null
+  if (n >= 97)  return 1.0
+  if (n >= 94)  return 1.25
+  if (n >= 91)  return 1.5
+  if (n >= 88)  return 1.75
+  if (n >= 85)  return 2.0
+  if (n >= 82)  return 2.25
+  if (n >= 79)  return 2.5
+  if (n >= 76)  return 2.75
+  if (n >= 75)  return 3.0
+  return 5.0
+}
+
+export const SPECIAL_GRADES = ['INC']
+
+export function isSpecialGrade(grade) {
+  return SPECIAL_GRADES.includes(String(grade))
+}
+
+// Grades are already stored as 'INC' or numeric strings, no normalization needed
+export function normalizeGrades(grades = []) {
+  return grades
+}
+
+/**
+ * Get remark and color based on GWA (1.0-5.0 scale)
  */
 export function getGWARemark(gwa) {
-  if (gwa == null) return null
-  if (gwa >= 90) return { label: 'Excellent',    color: 'green'  }
-  if (gwa >= 85) return { label: 'Very Good',    color: 'blue'   }
-  if (gwa >= 80) return { label: 'Good',         color: 'cyan'   }
-  if (gwa >= 75) return { label: 'Satisfactory', color: 'yellow' }
-  return             { label: 'Failed',        color: 'red'    }
+  if (gwa === null || gwa === undefined) return null
+  if (gwa <= 1.0)  return { label: 'Excellent',   color: 'green'  }
+  if (gwa <= 1.5)  return { label: 'Very Good',    color: 'green'  }
+  if (gwa <= 2.0)  return { label: 'Good',         color: 'blue'   }
+  if (gwa <= 2.5)  return { label: 'Satisfactory', color: 'cyan'   }
+  if (gwa <= 3.0)  return { label: 'Passing',      color: 'yellow' }
+  return                   { label: 'Failed',       color: 'red'    }
 }
 
 /**
@@ -58,7 +96,8 @@ export function getStatusColor(status) {
 export function attachGWA(students) {
   return students.map((s) => ({
     ...s,
-    gwa: computeGWA(s.grades ?? []),
+    grades: normalizeGrades(s.grades ?? []),
+    gwa: computeGWA(normalizeGrades(s.grades ?? [])),
   }))
 }
 

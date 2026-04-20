@@ -1,6 +1,8 @@
 'use client'
 
-// app/page.js
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import StatCard from '@/components/StatCard'
@@ -11,20 +13,24 @@ export default function DashboardPage() {
   const [stats, setStats]     = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
+  const [lastRefresh, setLastRefresh] = useState(null)
+
+  const fetchDashboard = async () => {
+    try {
+      setLoading(true)
+      const res  = await fetch(`/api/dashboard?_=${Date.now()}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setStats(json.data)
+      setLastRefresh(new Date())
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchDashboard() {
-      try {
-        const res  = await fetch('/api/dashboard')
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error)
-        setStats(json.data)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchDashboard()
   }, [])
 
@@ -43,15 +49,32 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-slate-400 text-sm mt-1">Overview of all student records</p>
+          <p className="text-slate-400 text-sm mt-1">
+            Overview of all student records
+            {lastRefresh && (
+              <span className="ml-2 text-xs">
+                · Last updated: {lastRefresh.toLocaleTimeString()}
+              </span>
+            )}
+          </p>
         </div>
-        <Link
-          href="/students/add"
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition w-fit"
-        >
-          <PlusCircle className="w-4 h-4" />
-          Add Student
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchDashboard}
+            disabled={loading}
+            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <Link
+            href="/students/add"
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition w-fit"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add Student
+          </Link>
+        </div>
       </div>
 
       {/* Error */}

@@ -3,21 +3,19 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { attachGWA, computeOverallGWA, groupByCourse } from '@/lib/helpers'
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const { data, error } = await supabase
       .from('students')
       .select(`
-        id,
-        student_id,
-        first_name,
-        last_name,
-        status,
-        year_level,
+        *,
         courses ( code, name ),
-        grades (
+        grades!grades_student_id_fkey (
           grade,
-          subjects ( units )
+          subjects!grades_subject_id_fkey ( units )
         )
       `)
       .order('created_at', { ascending: false })
@@ -34,9 +32,16 @@ export async function GET() {
     const byCourse   = groupByCourse(students)
     const recent     = students.slice(0, 5)
 
-    return NextResponse.json({
-      data: { total, active, graduated, dropped, inactive, overallGWA, byCourse, recent },
-    })
+    return NextResponse.json(
+      { data: { total, active, graduated, dropped, inactive, overallGWA, byCourse, recent } },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    )
   } catch (err) {
     console.error('[GET /api/dashboard]', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
