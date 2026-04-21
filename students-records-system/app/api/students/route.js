@@ -101,6 +101,15 @@ export async function POST(request) {
 
     if (studentError) throw studentError
 
+    // Step 3: Create enrollments in student_subjects table
+    const { data: enrollments, error: enrollmentError } = await supabase
+      .from('student_subjects')
+      .insert(subjects.map((s) => ({ student_id: student.id, subject_id: s.id })))
+      .select()
+
+    if (enrollmentError) throw new Error('Step 3 (insert enrollments): ' + enrollmentError.message)
+
+    // Step 4: Create grade rows using the enrollment IDs
     const gradeRows = subjects.map((s) => {
       const enrollment = enrollments.find((e) => e.subject_id === s.id)
       const rawGrade   = gradeMap[s.code]
