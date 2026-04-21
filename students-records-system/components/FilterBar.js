@@ -2,7 +2,7 @@
 
 // components/FilterBar.js
 
-const YEAR_LEVELS = ['All', '1', '2', '3', '4', '5']
+const YEAR_LEVELS = ['All', '1', '2', '3', '4']
 const STATUSES = ['All', 'Active', 'Inactive', 'Graduated', 'Dropped']
 
 export default function FilterBar({ courses = [], filters, onChange }) {
